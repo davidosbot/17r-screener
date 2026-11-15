@@ -1,6 +1,7 @@
 """
 Список акций NASDAQ для вкладки «Акции» сайта 17R Screener (14.11.2026, фильтры владельца).
 
+Колонки сайта: ATR(14) — для фильтра (как в Finviz), книжный ATR («batr») — для «Пройдено ATR», как у крипты.
 Отбор: только обычные акции компаний (тип CS — без ETF, фондов, ETN, варрантов), биржа NASDAQ,
 средний объём за 20 дней ≥ 300 000 акций, цена закрытия $5–200, ATR(14) ≥ $0.50.
 Данные: Polygon (Massive) — справочник тикеров и дневные свечи всего рынка (grouped daily), бесплатный тариф
@@ -69,6 +70,18 @@ def daily_bars(need):
     return days
 
 
+def book_atr(bars):
+    """Книжный ATR (как у крипты на сайте и у бота): 14 закрытых дней, грубый ATR — среднее 5 последних TR,
+    затем среднее 5 последних нормальных (грубый/3 < TR < 2·грубый)."""
+    b = bars[-14:]
+    trs = [max(x[1] - x[2], abs(x[1] - p[3]), abs(x[2] - p[3])) for p, x in zip(b[:-1], b[1:])]
+    if len(trs) < 5:
+        return None
+    rough = sum(trs[-5:]) / 5
+    clean = [t for t in reversed(trs) if rough / 3 < t < 2 * rough][:5]
+    return sum(clean) / len(clean) if clean else rough
+
+
 def pick(names, days):
     dates = sorted(days)
     rows = []
@@ -83,8 +96,9 @@ def pick(names, days):
         if vol < MIN_VOL or not (MIN_PRICE <= c <= MAX_PRICE) or atr < MIN_ATR:
             continue
         ch = (c / bars[-2][3] - 1) * 100 if bars[-2][3] else 0.0
+        ba = book_atr(bars) or atr
         rows.append({"t": t, "n": name, "p": round(c, 4), "ch": round(ch, 2), "v": round(vol),
-                     "atr": round(atr, 3), "atrp": round(atr / c * 100, 2)})
+                     "atr": round(atr, 3), "atrp": round(atr / c * 100, 2), "batr": round(ba, 4)})
     rows.sort(key=lambda r: -r["v"])
     return rows, dates[-1] if dates else None
 
