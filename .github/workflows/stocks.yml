@@ -1,0 +1,30 @@
+# Список акций NASDAQ для вкладки «Акции» (17R Screener). Кладётся в публичный репозиторий 17r-screener
+# по пути .github/workflows/stocks.yml; ключ Polygon — секрет POLYGON_KEY (Settings → Secrets and variables → Actions).
+name: stocks
+on:
+  schedule:
+    - cron: "17 12 * * 1-5"    # будни 12:17 UTC — перед открытием NASDAQ (16:17 по Тбилиси)
+    - cron: "43 22 * * 1-5"    # будни 22:43 UTC — после закрытия
+  workflow_dispatch: {}        # запуск вручную: вкладка Actions → stocks → Run workflow
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Список акций
+        env:
+          POLYGON_KEY: ${{ secrets.POLYGON_KEY }}
+        run: python stocks_list.py stocks.json
+      - name: Сохранить
+        run: |
+          git config user.name "stocks-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add stocks.json
+          git diff --cached --quiet || git commit -m "stocks.json"
+          git push
