@@ -1,0 +1,35 @@
+# Живые цены акций (Alpaca, бесплатный поток IEX) для вкладки «Акции» 17R Screener — каждые 15 минут
+# в часы торгов NASDAQ (13:00–21:59 UTC по будням покрывают и зимнее, и летнее время).
+# Ключи — секреты ALPACA_KEY_ID и ALPACA_SECRET (Settings → Secrets and variables → Actions).
+name: stocks-live
+on:
+  schedule:
+    - cron: "*/15 13-21 * * 1-5"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: stocks-push
+  cancel-in-progress: false
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Цены
+        env:
+          ALPACA_KEY_ID: ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET: ${{ secrets.ALPACA_SECRET }}
+        run: python stocks_live.py stocks.json stocks_live.json
+      - name: Сохранить
+        run: |
+          git config user.name "stocks-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add stocks_live.json
+          git diff --cached --quiet || git commit -m "stocks_live.json"
+          git pull --rebase --quiet
+          git push
